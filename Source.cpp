@@ -92,11 +92,13 @@ int singletonCounterexamples = 0;
 //Each line has the attribute numbers of attributes associated with the object represented by the line number.
 int counterexampleType = 1;
 
-// time 
+// time
 std::chrono::_V2::system_clock::time_point startTime, endTime;
 double ioTime = 0;
 
 vector<implicationBS> topKRulesBS;
+vector<int> topK_times;
+int timePointer = 0;
 
 void readFormalContext1(string fileName)
 {
@@ -740,41 +742,45 @@ vector<implication> BSBasisToVectorBasis(vector<implicationBS> ansBS)
 	return ans;
 }
 
+double calculatePrecision(vector<implicationBS> &basisBS)
+{
 
-double calculatePrecision(vector<implicationBS> &basisBS ){
+	int count = 0;
 
-	int count=0;
-	
-	for(int i=0;i < topKRulesBS.size();i++){
+	for (int i = 0; i < topKRulesBS.size(); i++)
+	{
 
-		for(int j=0;j<basisBS.size();j++){
-			if(topKRulesBS[i].lhs ==basisBS[j].lhs && topKRulesBS[i].rhs ==basisBS[j].rhs){
+		for (int j = 0; j < basisBS.size(); j++)
+		{
+			if (topKRulesBS[i].lhs == basisBS[j].lhs && topKRulesBS[i].rhs == basisBS[j].rhs)
+			{
+				// cout << topKRulesBS[i].lhs << ' ' << topKRulesBS[i].rhs << endl;
 				count++;
 				break;
 			}
 		}
 	}
-	return ((double)count)/basisBS.size();
+	return ((double)count) / basisBS.size();
 }
 
+double calculateRecall(vector<implicationBS> &basisBS)
+{
 
-double calculateRecall(vector<implicationBS> &basisBS){
+	long long result = 0;
 
-    long long result = 0;
+	for (int i = 0; i < topKRulesBS.size(); i++)
+	{
+		// implicationBS temp;
+		// temp.lhs = attrVectorToAttrBS(spmfImplications[i].first);
+		// temp.rhs = attrVectorToAttrBS(spmfImplications[i].second);
+		boost::dynamic_bitset<unsigned long> lhsCl =
+			closureBS(basisBS, topKRulesBS[i].lhs);
 
-    for(int i = 0; i < topKRulesBS.size(); i++) {
-        // implicationBS temp;
-        // temp.lhs = attrVectorToAttrBS(spmfImplications[i].first);
-        // temp.rhs = attrVectorToAttrBS(spmfImplications[i].second);
-        boost::dynamic_bitset<unsigned long> lhsCl = 
-        closureBS(basisBS, topKRulesBS[i].lhs);
+		if ((topKRulesBS[i].rhs).is_subset_of(lhsCl))
+			result++;
+	}
 
-        if((topKRulesBS[i].rhs).is_subset_of(lhsCl))
-            result++;
-    }
-
-    return result/((double)topKRulesBS.size());
-
+	return result / ((double)topKRulesBS.size());
 }
 
 void setNumThreads()
@@ -955,25 +961,39 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 		}
 
 		auto ioStart = chrono::high_resolution_clock::now();
-		for(auto &impl : ansBS){
+		for (auto &impl : ansBS)
+		{
 			vector<int> impl_lhs = attrBSToAttrVector(impl.lhs), impl_rhs = attrBSToAttrVector(impl.rhs);
 			printVector(impl_lhs);
 			cout << " => ";
 			printVector(impl_rhs);
 			cout << "\n";
 		}
-		auto precision = calculatePrecision(ansBS);
-		auto recall = calculateRecall(ansBS);
-		cout << "Precision " << precision << "\n" << "Recall " << recall << "\n";
-		auto ioEnd = chrono::high_resolution_clock::now();
-		ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
+
+		if(!topK_times.empty()){
+			if (timePointer >= topK_times.size()){
+				break;
+			}
+			else{
+				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
+				if(time_difference >= topK_times[timePointer] * 1000000){
+					auto ioStart = chrono::high_resolution_clock::now();
+					auto precision = calculatePrecision(ansBS);
+					auto recall = calculateRecall(ansBS);
+					cout << TIMEPRINT(time_difference) << " " << "Precision " << precision << "Recall " << recall << "\n";
+					auto ioEnd = chrono::high_resolution_clock::now();
+					ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
+					timePointer++;
+				}
+			}
+		}
 
 		end = std::chrono::high_resolution_clock::now();
 		totalExecTime2 += (chrono::duration_cast<chrono::microseconds>(end - start)).count() - ioTime;
 		duration = chrono::duration_cast<chrono::microseconds>(end - start);
 		prevThreads2 = numThreads;
 		prevIterTime2 = duration.count();
-		
+
 		// cout << duration.count() << "\n";
 	}
 
@@ -1358,46 +1378,47 @@ void CountExactRules()
 	}
 }
 
-
-void getTopKRules(string filename) {
+void getTopKRules(string filename)
+{
 	ifstream File(filename);
 
-    string line;
-    vector<implication> curImpVector;
+	string line;
+	vector<implication> curImpVector;
 	topKRulesBS.clear();
 
-    while(getline(File, line)) {
+	while (getline(File, line))
+	{
 		// cout << line << "\n\n";
-        stringstream ss(line);
-        string word;
-        implication curImp;  // lhs, rhs
+		stringstream ss(line);
+		string word;
+		implication curImp; // lhs, rhs
 
-        while(ss >> word) {
-            if(word[0] == '=') 
-            break;
+		while (ss >> word)
+		{
+			if (word[0] == '=')
+				break;
 
-            curImp.lhs.push_back(stoi(word)); 
-        }
+			curImp.lhs.push_back(stoi(word));
+		}
 
-        // implication.second = implication.first;
-        while(ss >> word) {
-            if(word[0] == '#') 
-            break;
+		// implication.second = implication.first;
+		while (ss >> word)
+		{
+			if (word[0] == '#')
+				break;
 
-            curImp.rhs.push_back(stoi(word)); 
-        }
+			curImp.rhs.push_back(stoi(word));
+		}
 
-        // // sort(implication.rhs.begin(), implication.rhs.end());
-        topKRulesBS.push_back(
+		// // sort(implication.rhs.begin(), implication.rhs.end());
+		topKRulesBS.push_back(
 			implicationBS(
-				{attrVectorToAttrBS(curImp.lhs), attrVectorToAttrBS(curImp.rhs)}
-			)
-		);
-
-    } 
+				{attrVectorToAttrBS(curImp.lhs), attrVectorToAttrBS(curImp.rhs)}));
+	}
 	File.close();
 }
 using namespace std;
+
 int main(int argc, char **argv)
 {
 	// auto startTime = chrono::high_resolution_clock::now();
@@ -1407,7 +1428,7 @@ int main(int argc, char **argv)
 	// ofstream output("topk/" + string(argv[1]) + "_" + string(argv[2]) + "_" + argv[4] + "_" + "output.txt", ios_base::app);
 	// cout.rdbuf(output.rdbuf());
 
-	if (argc < 8)
+	if (argc < 9)
 	{
 		printUsageAndExit();
 	}
@@ -1415,7 +1436,16 @@ int main(int argc, char **argv)
 	readFormalContext1(argv[1]);
 	initializeObjInpBS();
 	initFrequencyOrderedAttributes();
-	getTopKRules("connecttopk10100.txt");
+
+	string filename=argv[8];
+	for(int i=9;i<argc;i++){
+		topK_times.push_back(stoi(argv[i]));
+	}
+	getTopKRules(filename);
+	for(int i=0;i<topKRulesBS.size();i++){
+		cout<<topKRulesBS[i].lhs<<' '<<topKRulesBS[i].rhs<<endl;
+	}
+
 	epsilon = atof(argv[2]);
 	del = atof(argv[3]);
 	if (string(argv[4]) == string("strong"))
@@ -1494,7 +1524,7 @@ int main(int argc, char **argv)
 	// cout << allImplicationClosures() << endl;
 
 	// cout << endl;
-	
+
 	// ofstream output("output.csv", ios_base::app);
 
 	// ofstream outputImplications( string(argv[1]) + string(argv[2]) + argv[4] + "_impls.txt", ios_base::app);
@@ -1512,7 +1542,7 @@ int main(int argc, char **argv)
 	// 	cout << "LHSsupport " << supp_prem[i] << "\n";
 	// 	cout << "ImplicationSupport " << supp_imp[i];
 	// }
-	
+
 	// cout.rdbuf(output.rdbuf());
 
 	// ofstream runlog( "topk/run_log.txt", ios_base::app);
