@@ -944,7 +944,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				ansBS.push_back(implicationBS{X, allattribute});
 
 				// only for debugging
-				vector<int> vectorX = attrBSToAttrVector(X), vectorM = attrBSToAttrVector(allattribute);
+				// vector<int> vectorX = attrBSToAttrVector(X), vectorM = attrBSToAttrVector(allattribute);
 				// printVector(vectorX); cout << "=>"; printVector(vectorM); cout << "," << indexOfUpdatedImplication << "," << (chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime)).count() << "\n";
 				// cout << "Adding X -> M as : "; printVector(vectorX); cout << " ==> "; printVector(vectorM); cout << "\n\n";
 			}
@@ -960,16 +960,6 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 			}
 		}
 
-		auto ioStart = chrono::high_resolution_clock::now();
-		for (auto &impl : ansBS)
-		{
-			vector<int> impl_lhs = attrBSToAttrVector(impl.lhs), impl_rhs = attrBSToAttrVector(impl.rhs);
-			printVector(impl_lhs);
-			cout << " => ";
-			printVector(impl_rhs);
-			cout << "\n";
-		}
-
 		if(!topK_times.empty()){
 			if (timePointer >= topK_times.size()){
 				break;
@@ -978,9 +968,17 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
 				if(time_difference >= topK_times[timePointer] * 1000000){
 					auto ioStart = chrono::high_resolution_clock::now();
+					for (auto &impl : ansBS)
+					{
+						vector<int> impl_lhs = attrBSToAttrVector(impl.lhs), impl_rhs = attrBSToAttrVector(impl.rhs);
+						printVector(impl_lhs);
+						cout << " => ";
+						printVector(impl_rhs);
+						cout << "\n";
+					}
 					auto precision = calculatePrecision(ansBS);
 					auto recall = calculateRecall(ansBS);
-					cout << TIMEPRINT(time_difference) << " " << "Precision " << precision << "Recall " << recall << "\n";
+					cout << "Timestamp" << TIMEPRINT(time_difference) << " " << "Precision " << precision << " Recall " << recall << "\n";
 					auto ioEnd = chrono::high_resolution_clock::now();
 					ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
 					timePointer++;
