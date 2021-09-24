@@ -663,7 +663,6 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
 				updatedImplications.push_back({currIndex, implicationBS({A, B & counterExampleBS})});
 				vector<int> vectorA = attrBSToAttrVector(A);
 				vector<int> vectorRHS = attrBSToAttrVector(newB);
-				// printVector(vectorA); cout << "=>"; printVector(vectorRHS); cout << "," << currIndex << "," << (chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime)).count() << "\n";
 				continue;
 			}
 			lck.lock();
@@ -705,7 +704,6 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
 					updatedImplication.lhs = C;
 					updatedImplication.rhs = B;
 					vector<int> newLHS = attrBSToAttrVector(C), newRHS = attrBSToAttrVector(B);
-					// printVector(newLHS); cout << "=>"; printVector(newRHS); cout << "," << indexOfUpdatedImplication << "," << (chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime)).count() << "\n";
 				}
 
 				else if (basisUpdate && (curIndex < indexOfUpdatedImplication))
@@ -714,7 +712,6 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
 					updatedImplication.lhs = C;
 					updatedImplication.rhs = B;
 					vector<int> newLHS = attrBSToAttrVector(C), newRHS = attrBSToAttrVector(B);
-					// printVector(newLHS); cout << "=>"; printVector(newRHS); cout << "," << indexOfUpdatedImplication << "," << (chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime)).count() << "\n";
 				}
 
 				continue;
@@ -1386,7 +1383,6 @@ void getTopKRules(string filename)
 
 	while (getline(File, line))
 	{
-		// cout << line << "\n\n";
 		stringstream ss(line);
 		string word;
 		implication curImp; // lhs, rhs
@@ -1440,9 +1436,6 @@ int main(int argc, char **argv)
 		topK_times.push_back(stoi(argv[i]));
 	}
 	getTopKRules(filename);
-	for(int i=0;i<topKRulesBS.size();i++){
-		cout<<topKRulesBS[i].lhs<<' '<<topKRulesBS[i].rhs<<endl;
-	}
 
 	epsilon = atof(argv[2]);
 	del = atof(argv[3]);
@@ -1494,24 +1487,6 @@ int main(int argc, char **argv)
 	FindConfidenceOfImplications();
 	CountExactRules();
 
-	// cout << "\n";
-	// for (int i = 2; i < 7; i++)
-	// 	cout << argv[i] << ", ";
-
-	// cout << TIMEPRINT(TotalExecTime) << ",";
-	// cout << TIMEPRINT(totalTime) << ",";
-	// cout << TIMEPRINT(totalExecTime2) << ",";
-	// cout << TIMEPRINT(totalClosureTime) << ",";
-	// cout << TIMEPRINT(updownTime) << ",";
-	// cout << totClosureComputations << ",";
-	// cout << totUpDownComputes << ", ";
-	// cout << ans.size() << ", ";
-	// cout << totCounterExamples << ",";
-	// cout << sumTotTries << ",";
-	// cout << aEqualToCCount << ",";
-	// cout << emptySetClosureComputes << ",";
-	// cout << singletonCounterexamples << ";" << flush;
-	//cout << allContextClosures() << "," << flush;
 	if (implicationSupport)
 	{
 		getSupportOfImplicationsFrequent();
@@ -1519,32 +1494,7 @@ int main(int argc, char **argv)
 		getSupportOfImplicationsSquared();
 	}
 
-	// cout << allImplicationClosures() << endl;
-
-	// cout << endl;
-
-	// ofstream output("output.csv", ios_base::app);
-
-	// ofstream outputImplications( string(argv[1]) + string(argv[2]) + argv[4] + "_impls.txt", ios_base::app);
-	// streambuf *coutBuffer = cout.rdbuf();
-
-	// cout.rdbuf(outputImplications.rdbuf());
-	// for (int i = 0; i < ans.size(); i++)
-	// {
-	// 	// //cout << "Implication\n";
-	// 	cout << "\n";
-	// 	printVector(ans[i].lhs);
-	// 	cout << "==> ";
-	// 	printVector(ans[i].rhs);
-	// 	cout << "\nconfidence " << confidenceOfImplicationBasis[i] << "\n";
-	// 	cout << "LHSsupport " << supp_prem[i] << "\n";
-	// 	cout << "ImplicationSupport " << supp_imp[i];
-	// }
-
-	// cout.rdbuf(output.rdbuf());
-
-	// ofstream runlog( "topk/run_log.txt", ios_base::app);
-	// cout.rdbuf(runlog.rdbuf());
+	
 	// ExecutionTime, #iteration, #implications, #TotalCounterEx, #positiveCounterEx, #negativeCounterEx, #exactRules, #highConfidence, qualityFactor, QFtime
 	for (int i = 1; i < 6; i++)
 		cout << argv[i] << ",";
