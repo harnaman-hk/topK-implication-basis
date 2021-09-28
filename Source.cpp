@@ -88,6 +88,7 @@ double prevIterTime = 0;
 int UpdateImplicationTries = 0;
 int prevThreads = 1;
 int singletonCounterexamples = 0;
+int k_value;
 //Can be used in case the input format is:
 //Each line has the attribute numbers of attributes associated with the object represented by the line number.
 int counterexampleType = 1;
@@ -777,6 +778,8 @@ double calculateRecall(vector<implicationBS> &basisBS)
 			result++;
 	}
 
+	// cout<<"hisis top k size"<<topKRulesBS.size()<<endl;
+
 	return result / ((double)topKRulesBS.size());
 }
 
@@ -957,7 +960,25 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 			}
 		}
 
-		if(!topK_times.empty()){
+		if(!topK_times.empty() && topK_times[0]<0){
+			if(ansBS.size()>=k_value+1 ){
+				for(int i=0;i<ansBS.size();i++){
+					vector<int> impl_lhs=attrBSToAttrVector(ansBS[i].lhs), impl_rhs=attrBSToAttrVector(ansBS[i].rhs);
+					printVector(impl_lhs);
+					cout<<" ==> ";
+					printVector(impl_rhs);
+					cout << "\n";
+				}
+				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
+
+				auto precision = calculatePrecision(ansBS);
+				auto recall = calculateRecall(ansBS);
+				cout <<"BasisSize "<< ansBS.size() << "  Timestamp" << TIMEPRINT(time_difference) << " " << "Precision " << precision << " Recall " << recall << "\n";
+				break;
+			}
+			
+		}
+		if(!topK_times.empty() && topK_times[0]>=0){
 			if (timePointer >= topK_times.size()){
 				break;
 			}
@@ -1376,13 +1397,13 @@ void CountExactRules()
 void getTopKRules(string filename)
 {
 	ifstream File(filename);
-
+	
 	string line;
 	vector<implication> curImpVector;
 	topKRulesBS.clear();
 
 	while (getline(File, line))
-	{
+	{	
 		stringstream ss(line);
 		string word;
 		implication curImp; // lhs, rhs
@@ -1409,7 +1430,29 @@ void getTopKRules(string filename)
 			implicationBS(
 				{attrVectorToAttrBS(curImp.lhs), attrVectorToAttrBS(curImp.rhs)}));
 	}
+	// cout<<"check1"<<topKRulesBS.size()<<endl;
 	File.close();
+}
+
+int getkvalue(string filename){
+	int startcoll=0, count_us=0;
+	string kval="";
+	for(int i=0;i<filename.length();i++){
+		if(startcoll && filename[i]!='_'){
+			kval+=filename[i];
+			if(filename[i+1]=='_'){
+				break;
+			}
+		}
+		else if(count_us==1 && filename[i]=='_'){
+			startcoll=1;
+		}
+		else if(filename[i]=='_'){
+			count_us++;
+			// startcoll=1;
+		}
+	}
+	return stoi(kval);
 }
 using namespace std;
 
@@ -1435,6 +1478,8 @@ int main(int argc, char **argv)
 	for(int i=9;i<argc;i++){
 		topK_times.push_back(stoi(argv[i]));
 	}
+	k_value=getkvalue(filename);
+	// cout<<k_value<<endl;
 	getTopKRules(filename);
 
 	epsilon = atof(argv[2]);
