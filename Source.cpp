@@ -89,6 +89,7 @@ int UpdateImplicationTries = 0;
 int prevThreads = 1;
 int singletonCounterexamples = 0;
 int k_value;
+double minconf_value;
 //Can be used in case the input format is:
 //Each line has the attribute numbers of attributes associated with the object represented by the line number.
 int counterexampleType = 1;
@@ -740,25 +741,124 @@ vector<implication> BSBasisToVectorBasis(vector<implicationBS> ansBS)
 	return ans;
 }
 
+int findPremiseSupportOfParticularImplication(vector<implicationBS> & basisBS, int i)
+{
+	int support_premsis = 0;
+	for (int j = 0; j < objInpBS.size(); j++)
+	{
+
+		if (basisBS[i].lhs.is_subset_of(objInpBS[j]))
+		{
+			support_premsis++;
+		}
+
+	}
+	return support_premsis;
+}
+
+int findImplicationSupportOfParticularImplication(vector<implicationBS> & basisBS, int i)
+{
+	int support_premsis = 0;
+	int support_implication = 0;
+	for (int j = 0; j < objInpBS.size(); j++)
+	{
+		if (basisBS[i].lhs.is_subset_of(objInpBS[j]) && basisBS[i].rhs.is_subset_of(objInpBS[j]))
+		{
+			support_implication++;
+		}
+	}
+	return support_implication;
+}
+
+double FindConfidenceOfParticularImplication(vector<implicationBS> & basisBS, int i)
+{
+
+		int support_premsis = 0;
+		int support_implication = 0;
+		for (int j = 0; j < objInpBS.size(); j++)
+		{
+
+			if (basisBS[i].lhs.is_subset_of(objInpBS[j]))
+			{
+				support_premsis++;
+			}
+
+			if (basisBS[i].lhs.is_subset_of(objInpBS[j]) && basisBS[i].rhs.is_subset_of(objInpBS[j]))
+			{
+				support_implication++;
+			}
+		}
+
+		return ((double)support_implication / support_premsis);
+}
+
+
+
+
 double calculatePrecision(vector<implicationBS> &basisBS)
 {
 
-	int count = 0;
+	// int count = 0;
 
-	for (int i = 0; i < topKRulesBS.size(); i++)
+// 	for (int i = 0; i < topKRulesBS.size(); i++)
+// 	{
+
+// 		for (int j = 0; j < basisBS.size(); j++)
+// 		{	
+// 			cout << "topklhs: "<<topKRulesBS[i].lhs << ' ' << "topkrhs: "<<topKRulesBS[i].rhs << endl;
+// 			cout<<"basislhs: "<<basisBS[j].lhs<<' '<<"basisrhs: "<<basisBS[j].rhs<<endl;
+			
+// 			if (topKRulesBS[i].lhs == basisBS[j].lhs && topKRulesBS[i].rhs == basisBS[j].rhs)
+// 			{
+// 				// cout << topKRulesBS[i].lhs << ' ' << topKRulesBS[i].rhs << endl;
+// 				// cout<<basisBS[j].lhs<<' 'basisBS[j].rhs<<endl;
+// 				count++;
+// 				break;
+// 			}
+// 		}
+// 	}
+// 	return ((double)count) / basisBS.size();
+
+
+
+	long long result = 0;
+
+	for (int i = 0; i < basisBS.size(); i++)
 	{
+		
+		boost::dynamic_bitset<unsigned long> lhsCl =
+			closureBS(topKRulesBS, basisBS[i].lhs);
 
-		for (int j = 0; j < basisBS.size(); j++)
-		{
-			if (topKRulesBS[i].lhs == basisBS[j].lhs && topKRulesBS[i].rhs == basisBS[j].rhs)
-			{
-				// cout << topKRulesBS[i].lhs << ' ' << topKRulesBS[i].rhs << endl;
-				count++;
-				break;
-			}
+		if ((basisBS[i].rhs).is_subset_of(lhsCl))
+			result++;
+	}
+
+
+	return result / ((double)basisBS.size());
+}
+
+double calculatePrecisionFilter(vector<implicationBS> &baBS, double minconf)
+{
+	long long result = 0;
+	vector<implicationBS> basisBS;
+	for(int i=0;i<baBS.size();i++){
+		if(FindConfidenceOfParticularImplication(baBS, i)>=minconf_value){
+			basisBS.push_back(baBS[i]);
 		}
 	}
-	return ((double)count) / basisBS.size();
+	// cout<<baBS.size()<<' '<<basisBS.size()<<endl;
+
+	for (int i = 0; i < basisBS.size(); i++)
+	{
+		
+		boost::dynamic_bitset<unsigned long> lhsCl =
+			closureBS(topKRulesBS, basisBS[i].lhs);
+
+		if ((basisBS[i].rhs).is_subset_of(lhsCl))
+			result++;
+	}
+
+	return result / ((double)basisBS.size());
 }
 
 double calculateRecall(vector<implicationBS> &basisBS)
@@ -778,10 +878,35 @@ double calculateRecall(vector<implicationBS> &basisBS)
 			result++;
 	}
 
-	// cout<<"hisis top k size"<<topKRulesBS.size()<<endl;
 
 	return result / ((double)topKRulesBS.size());
 }
+
+
+double calculateRecallFilter(vector<implicationBS> &baBS, double minconf)
+{
+
+	long long result = 0;
+	vector<implicationBS> basisBS;
+	for(int i=0;i<baBS.size();i++){
+		if(FindConfidenceOfParticularImplication(baBS, i)>=minconf_value){
+			basisBS.push_back(baBS[i]);
+		}
+	}
+
+	for (int i = 0; i < topKRulesBS.size(); i++)
+	{
+			boost::dynamic_bitset<unsigned long> lhsCl =
+			closureBS(basisBS, topKRulesBS[i].lhs);
+
+		if ((topKRulesBS[i].rhs).is_subset_of(lhsCl))
+			result++;
+	}
+
+
+	return result / ((double)topKRulesBS.size());
+}
+
 
 void setNumThreads()
 {
@@ -806,6 +931,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 	double prevIterTime1 = 0, prevIterTime2 = 0;
 	double prevThreads1 = 1, prevThreads2 = 1;
 
+	int count_rules=0;
 	while (true)
 	{
 		auto start = chrono::high_resolution_clock::now();
@@ -926,23 +1052,51 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				vector<int> initial_lhs = attrBSToAttrVector(ansBS[updateImp.first].lhs),
 							initial_rhs = attrBSToAttrVector(ansBS[updateImp.first].rhs);
 				// cout<<"\nPrevious implication at index "<<updateImp.first<<" was: ";printVector(initial_lhs);cout<<" ==> ";printVector(initial_rhs);cout<<"\n";
+				bool isgrt=false;
+				if(FindConfidenceOfParticularImplication(ansBS,updateImp.first)>=minconf_value){
+					isgrt=true;
+				}
 				ansBS[updateImp.first] = updateImp.second;
 
 				vector<int> new_lhs = attrBSToAttrVector(ansBS[updateImp.first].lhs),
 							new_rhs = attrBSToAttrVector(ansBS[updateImp.first].rhs);
-				// cout<<"Now implication is :";printVector(initial_lhs);cout<<" ==> ";printVector(initial_rhs);cout<<"\n\n";
+			
+
+				int ToBeAdded=0;
+				if(FindConfidenceOfParticularImplication(ansBS, updateImp.first)>=minconf_value){
+					ToBeAdded=1;
+				}
+				if(!isgrt){
+					count_rules+=ToBeAdded;
+				}
+				else{
+					if(ToBeAdded==0){
+						if(isgrt){
+							cout<<"WARNING1!!!\n";
+							cout<<"Old implication: ";printVector(initial_lhs);cout<<" ==> ";printVector(initial_rhs);cout<<endl;
+							cout<<"New implication: ";printVector(new_lhs);cout<<" ==> ";printVector(new_rhs);
+							count_rules-=1;
+						}
+
+					}
+				}
+
+					// cout<<"Now implication is :";printVector(initial_lhs);cout<<" ==> ";printVector(initial_rhs);cout<<"\n\n";
 			}
 		}
 		else
 		{
 			if (!basisUpdate)
-			{
+			{		
 				// ansBS.push_back(implicationBS{X, contextClosureBS(X)});
 				boost::dynamic_bitset<unsigned long> allattribute(attrInp.size());
 				allattribute.set();
 				allattribute[0] = false;
 				ansBS.push_back(implicationBS{X, allattribute});
-
+				// cout<<"Hii"<<endl;
+				if(FindConfidenceOfParticularImplication(ansBS,ansBS.size()-1)>=minconf_value){
+					count_rules++;
+				}
 				// only for debugging
 				// vector<int> vectorX = attrBSToAttrVector(X), vectorM = attrBSToAttrVector(allattribute);
 				// printVector(vectorX); cout << "=>"; printVector(vectorM); cout << "," << indexOfUpdatedImplication << "," << (chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime)).count() << "\n";
@@ -956,23 +1110,72 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 							newRHS = attrBSToAttrVector(updatedImplication.rhs);
 				// cout << "Initial Implication: "; printVector(initialLHS); cout << " ==> "; printVector(initialRHS); cout << "\n";
 				// cout << "Updated Implication: "; printVector(newLHS); cout << " ==> "; printVector(newRHS); cout << "\n\n";
+				
+				bool isgrt=false;
+				double confBefore=FindConfidenceOfParticularImplication(ansBS,indexOfUpdatedImplication);
+				if(confBefore>=minconf_value){
+					isgrt=true;
+				}
+				// cout<<ansBS[indexOfUpdatedImplication].lhs<<endl;;
+				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].lhs));
+				// cout<<"==> ";
+				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].rhs));
+				int supp_impl_before = findImplicationSupportOfParticularImplication(ansBS, indexOfUpdatedImplication),
+					supp_prem_before = findPremiseSupportOfParticularImplication(ansBS, indexOfUpdatedImplication);
 				ansBS[indexOfUpdatedImplication] = updatedImplication;
+
+				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].lhs));
+				// cout<<"==> ";
+				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].rhs));
+
+
+				int ToBeAdded=0;
+				double confAfter=FindConfidenceOfParticularImplication(ansBS, indexOfUpdatedImplication);
+				if(confAfter>=minconf_value){
+					// cout<<minconf_value<<endl;
+					ToBeAdded=1;
+				}
+				if(!isgrt){
+					count_rules+=ToBeAdded;
+				}
+				else{
+					if(ToBeAdded==0){
+						if(isgrt){
+							cout<<"WARNING2!!!\n";
+							cout<<"Old implication: ";printVector(initialLHS);cout<<" ==> ";printVector(initialRHS);cout<< " #SUP_IMPL: " << supp_impl_before << " #SUP_PREM: " << supp_prem_before << " #CONF: "<<confBefore;cout<<endl;
+							cout<<"New implication: ";printVector(newLHS);cout<<" ==> ";printVector(newRHS);cout << " #SUP_IMPL: " << findImplicationSupportOfParticularImplication(ansBS, indexOfUpdatedImplication) << " #SUP_PREM: " << findPremiseSupportOfParticularImplication(ansBS, indexOfUpdatedImplication) <<"#CONF: "<<confAfter;
+							cout<<endl;
+							count_rules-=1;
+						}
+
+					}
+				}
+
 			}
 		}
 
+		
 		if(!topK_times.empty() && topK_times[0]<0){
-			if(ansBS.size()>=k_value+1 ){
+		//K+1 stop
+
+			if(count_rules>=k_value ){
 				for(int i=0;i<ansBS.size();i++){
 					vector<int> impl_lhs=attrBSToAttrVector(ansBS[i].lhs), impl_rhs=attrBSToAttrVector(ansBS[i].rhs);
 					printVector(impl_lhs);
 					cout<<" ==> ";
 					printVector(impl_rhs);
+					double con=FindConfidenceOfParticularImplication(ansBS, i);
+					int supp_impl = findImplicationSupportOfParticularImplication(ansBS, i),
+						supp_prem = findPremiseSupportOfParticularImplication(ansBS, i);
+					cout<< " #SUP_IMPL: " << supp_impl << " #Supp_Prem: " << supp_prem << " #CONF: "<<con;
+					if(con>=minconf_value){
+						cout<<" #Y";
+					}
 					cout << "\n";
 				}
 				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
-
-				auto precision = calculatePrecision(ansBS);
-				auto recall = calculateRecall(ansBS);
+				auto precision = calculatePrecisionFilter(ansBS, minconf_value);
+				auto recall = calculateRecallFilter(ansBS, minconf_value);
 				cout <<"BasisSize "<< ansBS.size() << "  Timestamp" << TIMEPRINT(time_difference) << " " << "Precision " << precision << " Recall " << recall << "\n";
 				break;
 			}
@@ -986,17 +1189,22 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
 				if(time_difference >= topK_times[timePointer] * 1000000){
 					auto ioStart = chrono::high_resolution_clock::now();
-					for (auto &impl : ansBS)
+					for (int i=0;i<ansBS.size();i++)
 					{
-						vector<int> impl_lhs = attrBSToAttrVector(impl.lhs), impl_rhs = attrBSToAttrVector(impl.rhs);
+						vector<int> impl_lhs = attrBSToAttrVector(ansBS[i].lhs), impl_rhs = attrBSToAttrVector(ansBS[i].rhs);
 						printVector(impl_lhs);
 						cout << " => ";
 						printVector(impl_rhs);
+						cout << " #SUP_IMPL: " << findImplicationSupportOfParticularImplication(ansBS, i) << " #Supp_Prem: " << findPremiseSupportOfParticularImplication(ansBS, i) <<" #CONF: "<<FindConfidenceOfParticularImplication(ansBS, i);
+
 						cout << "\n";
 					}
 					auto precision = calculatePrecision(ansBS);
 					auto recall = calculateRecall(ansBS);
+					auto FilterPrecision = calculatePrecisionFilter(ansBS, minconf_value);
+					auto FilterRecall = calculateRecallFilter(ansBS, minconf_value);
 					cout << "Timestamp" << TIMEPRINT(time_difference) << " " << "Precision " << precision << " Recall " << recall << "\n";
+					cout<<"Precision with Filter: "<<FilterPrecision<<" Recall with Filter: "<<FilterRecall<<endl;
 					auto ioEnd = chrono::high_resolution_clock::now();
 					ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
 					timePointer++;
@@ -1016,10 +1224,12 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 	ansBasisBS = ansBS;
 	return BSBasisToVectorBasis(ansBS);
 }
+
 vector<double> confidenceOfImplicationBasis;
 
 vector<int> supp_imp;
 vector<int> supp_prem;
+
 
 void FindConfidenceOfImplications()
 {
@@ -1424,7 +1634,8 @@ void getTopKRules(string filename)
 
 			curImp.rhs.push_back(stoi(word));
 		}
-
+		// cout<<"lhs:  ";printVector(curImp.lhs); 
+		// cout<<"rhs:  ";printVector(curImp.rhs);cout<<endl;
 		// // sort(implication.rhs.begin(), implication.rhs.end());
 		topKRulesBS.push_back(
 			implicationBS(
@@ -1434,7 +1645,7 @@ void getTopKRules(string filename)
 	File.close();
 }
 
-int getkvalue(string filename){
+void get_kvalue_minconf(string filename){
 	int startcoll=0, count_us=0;
 	string kval="";
 	for(int i=0;i<filename.length();i++){
@@ -1452,7 +1663,17 @@ int getkvalue(string filename){
 			// startcoll=1;
 		}
 	}
-	return stoi(kval);
+
+	int len_file= filename.length();
+	string minconf="";
+	for (int i=len_file-7;i<len_file;i++){
+		minconf+=filename[i];
+	}
+	if(minconf[0]=='_'){
+		minconf=minconf.substr(1,2);
+	}
+	k_value=stoi(kval);
+	minconf_value= (double)stoi(minconf)/100;
 }
 using namespace std;
 
@@ -1478,10 +1699,10 @@ int main(int argc, char **argv)
 	for(int i=9;i<argc;i++){
 		topK_times.push_back(stoi(argv[i]));
 	}
-	k_value=getkvalue(filename);
+	get_kvalue_minconf(filename);
 	// cout<<k_value<<endl;
 	getTopKRules(filename);
-
+	// cout<<topKRulesBS.size();
 	epsilon = atof(argv[2]);
 	del = atof(argv[3]);
 	if (string(argv[4]) == string("strong"))
@@ -1529,8 +1750,9 @@ int main(int argc, char **argv)
 	// endTime = chrono::high_resolution_clock::now();
 	// double Time_qf = (chrono::duration_cast<chrono::microseconds>(endTime - startTime)).count();
 
-	FindConfidenceOfImplications();
-	CountExactRules();
+	// FindConfidenceOfImplications();
+
+	// CountExactRules();
 
 	if (implicationSupport)
 	{
@@ -1539,7 +1761,19 @@ int main(int argc, char **argv)
 		getSupportOfImplicationsSquared();
 	}
 
+	if(topK_times.empty()){
+		for(int i=0;i<ansBasisBS.size();i++){
+			vector<int> impl_lhs= attrBSToAttrVector (ansBasisBS[i].lhs);
+			printVector(impl_lhs); 
+			cout<<"==> ";
+			vector<int> impl_rhs= attrBSToAttrVector (ansBasisBS[i].rhs);
+			printVector(impl_rhs);
+			cout << " #SUP_IMPL: " << findImplicationSupportOfParticularImplication(ansBasisBS, i) << " #Supp_Prem: " << findPremiseSupportOfParticularImplication(ansBasisBS, i) << "#CONF: "<<FindConfidenceOfParticularImplication(ansBasisBS, i);
+			cout<<"\n";
+		}
+	}
 	
+	cout<<"TimeTaken: "<<TIMEPRINT(TotalExecTime- ioTime)<<" Basis Size: "<<ans.size()<<"\n";
 	// ExecutionTime, #iteration, #implications, #TotalCounterEx, #positiveCounterEx, #negativeCounterEx, #exactRules, #highConfidence, qualityFactor, QFtime
 	for (int i = 1; i < 6; i++)
 		cout << argv[i] << ",";
@@ -1553,7 +1787,7 @@ int main(int argc, char **argv)
 	cout << NoOfRulesConfHighThanPoint9 << ",";
 	// cout << qf << ",";
 	// cout << TIMEPRINT(Time_qf);
-	cout << "\n";
+	cout << "\n\n";
 
 	return 0;
 }
