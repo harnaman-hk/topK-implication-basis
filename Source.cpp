@@ -76,6 +76,7 @@ std::discrete_distribution<long long> discreteDistributionSquared;
 std::discrete_distribution<long long> discreteDistributionDiscriminativity;
 std::binomial_distribution<int> binomialDistribution;
 std::default_random_engine re(rd());
+std::minstd_rand new_rand;
 
 vector<std::discrete_distribution<int>> discreteDistributionAttributeSets;
 vector<int> objectLabels, positiveObjects, negativeObjects;
@@ -104,19 +105,6 @@ double ioTime = 0;
 vector<implicationBS> topKRulesBS;
 vector<int> topK_times;
 int timePointer = 0;
-
-template<class bidiiter>
-bidiiter random_unique(bidiiter begin, bidiiter end, size_t num_random) {
-    size_t left = std::distance(begin, end);
-    while (num_random--) {
-        bidiiter r = begin;
-        std::advance(r, rand()%left);
-        std::swap(*begin, *r);
-        ++begin;
-        --left;
-    }
-    return begin;
-}
 
 void readFormalContext1(string fileName)
 {
@@ -394,6 +382,15 @@ boost::dynamic_bitset<unsigned long> contextClosureBS(boost::dynamic_bitset<unsi
 	return ansBS;
 }
 
+int biasInclusion(double bias)
+{
+	if((rand() / RAND_MAX) < bias)
+	{
+		return 1;
+	}
+	return 0;
+}
+
 boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitset<unsigned long> &aset, double percentObj)
 {
 	totUpDownComputes++;
@@ -416,35 +413,20 @@ boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitse
 
 	if (aid != -1)
 	{
+		percentObj = ceil(RAND_MAX * percentObj);
 
-		vector<int> commonObjects;
-		for (int i = 0; i < osize; i++)
+		for (int i = 0; i < attrInp[aid].size(); i++)
 		{
 			int cObj = attrInp[aid][i];
 
 			if (aBS.is_subset_of(objInpBS[cObj]))
 			{
-				commonObjects.push_back(cObj);
+				if((new_rand() < percentObj))
+					ansBS &= objInpBS[cObj];
 			}
-		}
 
-		int nObj = ceil(percentObj * commonObjects.size());
-
-		if(nObj > commonObjects.size())
-		{
-			cout << "Invalid percentage for closure computation\n";
-			exit(1);
-		}
-
-		random_unique(commonObjects.begin(), commonObjects.end(), nObj);
-
-		for(int i = 0; i < nObj; i++)
-		{
-			int cObj = commonObjects[i];
-			if(aBS.is_subset_of(objInpBS[cObj]))
-			{
-				ansBS &= objInpBS[cObj];
-			}
+			// if(ansBS.count() == aBS.count())
+			// 	return ansBS;
 		}
 	}
 
@@ -1289,6 +1271,9 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 		//K stop
 
 			if(count_rules>=k_value ){
+				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
+
+				auto ioStart = chrono::high_resolution_clock::now();
 				for(int i=0;i<ansBS.size();i++){
 					vector<int> impl_lhs=attrBSToAttrVector(ansBS[i].lhs), impl_rhs=attrBSToAttrVector(ansBS[i].rhs);
 					printVector(impl_lhs);
@@ -1306,7 +1291,6 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 					}
 					cout << "\n";
 				}
-				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
 				auto precision = calculatePrecisionFilter(ansBS, minconf_value);
 				auto recall = calculateRecallFilter(ansBS, minconf_value);
 
@@ -1318,6 +1302,9 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				}
 				cout <<"\nBasisSize "<< ansBS.size() << "  Timestamp " << TIMEPRINT(time_difference) << " " << "Precision " << precision << " Recall " << recall << " Closed Count: " << countClosedPremises << "\n";
 				cout<<"\n\n";
+
+				auto ioEnd = chrono::high_resolution_clock::now();
+				ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
 				break;
 			}
 			
@@ -1853,7 +1840,7 @@ int main(int argc, char **argv)
 		topK_times.push_back(stoi(argv[i]));
 	}
 	get_kvalue_minconf_percent(filename);
-	percentAttrClosure = 1;
+	percentAttrClosure = minconf_value;
 	if(percentAttrClosure > 1.0)
 		percentAttrClosure /= 100;
 	// cout<<k_value<<endl;
