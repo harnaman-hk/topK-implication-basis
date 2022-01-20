@@ -94,6 +94,9 @@ int k_value;
 double minconf_value;
 double percentAttrClosure;
 
+// per thread debugging
+long long int *randGenCount, *foundCexCount, *updateImplicationIteration;
+
 //Can be used in case the input format is:
 //Each line has the attribute numbers of attributes associated with the object represented by the line number.
 int counterexampleType = 1;
@@ -391,9 +394,10 @@ int biasInclusion(double bias)
 	return 0;
 }
 
-boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitset<unsigned long> &aset, double percentObj)
+boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitset<unsigned long> &aset, double percentObj, int threadIndex)
 {
 	totUpDownComputes++;
+	percentObj = ceil(RAND_MAX * percentObj);
 	boost::dynamic_bitset<unsigned long> aBS = aset, ansBS(attrInp.size());
 	ansBS.set();
 	ansBS[0] = false;
@@ -413,7 +417,6 @@ boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitse
 
 	if (aid != -1)
 	{
-		percentObj = ceil(RAND_MAX * percentObj);
 
 		for (int i = 0; i < attrInp[aid].size(); i++)
 		{
@@ -421,6 +424,7 @@ boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitse
 
 			if (aBS.is_subset_of(objInpBS[cObj]))
 			{
+				randGenCount[threadIndex] += 1;
 				if ((new_rand() < percentObj))
 					ansBS &= objInpBS[cObj];
 			}
@@ -596,7 +600,7 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 	boost::dynamic_bitset<unsigned long> X;
 
 	for (int i = s; i < maxTries && globalFlag; i += numThreads)
-	{ //Each thread handles an equal number of iterations.
+	{ // Each thread handles an equal number of iterations.
 		threadTries++;
 
 		if (frequentCounterExamples)
@@ -623,6 +627,7 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 				counterExampleBS = cX;
 				isPositiveCounterExample = true;
 				lck.unlock();
+				foundCexCount[s]++;
 				break;
 			}
 
@@ -633,6 +638,7 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 				counterExampleBS = cL;
 				isPositiveCounterExample = false;
 				lck.unlock();
+				foundCexCount[s]++;
 				break;
 			}
 		}
@@ -648,6 +654,7 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 					counterExampleBS = X;
 					isPositiveCounterExample = true;
 					lck.unlock();
+					foundCexCount[s]++;
 					break;
 				}
 			}
@@ -660,6 +667,7 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 					counterExampleBS = X;
 					isPositiveCounterExample = false;
 					lck.unlock();
+					foundCexCount[s]++;
 					break;
 				}
 			}
@@ -716,7 +724,7 @@ void tryPotentialCounterExamples(vector<implicationBS> &basis)
 	}
 }
 
-void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
+void tryToUpdateImplicationBasis(vector<implicationBS> &basis, int threadIndex)
 {
 	std::unique_lock<std::mutex> lck(mtx, std::defer_lock);
 	double threadContextClosureTime = 0;
@@ -726,6 +734,7 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
 		while (implicationsSeen < basis.size())
 		{
 			UpdateImplicationTries++;
+			updateImplicationIteration[threadIndex]++;
 			int currIndex = implicationsSeen;
 			boost::dynamic_bitset<unsigned long> A = basis[currIndex].lhs;
 			boost::dynamic_bitset<unsigned long> B = basis[currIndex].rhs;
@@ -748,6 +757,7 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
 		while ((implicationsSeen < basis.size()) && (!basisUpdate))
 		{
 			UpdateImplicationTries++;
+			updateImplicationIteration[threadIndex]++;
 			boost::dynamic_bitset<unsigned long> A = basis[implicationsSeen].lhs;
 			boost::dynamic_bitset<unsigned long> B = basis[implicationsSeen].rhs;
 			int curIndex = implicationsSeen;
@@ -761,7 +771,7 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis)
 				aEqualToCCount--;
 				auto durBegin = chrono::high_resolution_clock::now();
 				// boost::dynamic_bitset<unsigned long> cC = contextClosureBS(C);
-				boost::dynamic_bitset<unsigned long> cC = randomContextClosureBS(C, percentAttrClosure);
+				boost::dynamic_bitset<unsigned long> cC = randomContextClosureBS(C, percentAttrClosure, threadIndex);
 				auto durEnd = chrono::high_resolution_clock::now();
 				threadContextClosureTime += (chrono::duration_cast<chrono::microseconds>(durEnd - durBegin)).count();
 
@@ -1177,9 +1187,9 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 		UpdateImplicationTries = 0;
 
 		for (int i = 1; i < numThreads; i++)
-			taskVector.emplace_back(threadPool.enqueue(tryToUpdateImplicationBasis, ref(ansBS)));
+			taskVector.emplace_back(threadPool.enqueue(tryToUpdateImplicationBasis, ref(ansBS), i));
 
-		tryToUpdateImplicationBasis(ansBS);
+		tryToUpdateImplicationBasis(ansBS, 0);
 
 		for (int i = 0; i < taskVector.size(); i++)
 		{
@@ -1808,10 +1818,27 @@ void get_kvalue_minconf(string filename)
 	k_value = stoi(kval);
 	minconf_value = (double)stoi(minconf) / 100;
 }
+
+void intialiseDebugStores(int maxThreads)
+{
+	randGenCount = new long long int[maxThreads];
+	foundCexCount = new long long int[maxThreads];
+	updateImplicationIteration = new long long int[maxThreads];
+	for(int i = 0; i < maxThreads; i++){
+		randGenCount[i] = 0;
+		foundCexCount[i] = 0;
+		updateImplicationIteration[i] = 0;
+	}
+}
+
 using namespace std;
 
 int main(int argc, char **argv)
 {
+	string filename = argv[9];
+	get_kvalue_minconf(filename);
+	intialiseDebugStores(atoi(argv[7]));
+
 	startTime = chrono::high_resolution_clock::now();
 	srand(time(NULL));
 
@@ -1824,13 +1851,11 @@ int main(int argc, char **argv)
 	initializeObjInpBS();
 	initFrequencyOrderedAttributes();
 
-	string filename = argv[9];
 	for (int i = 10; i < argc; i++)
 	{
 		topK_times.push_back(stoi(argv[i]));
 	}
 
-	get_kvalue_minconf(filename);
 
 	epsilon = atof(argv[2]);
 	del = atof(argv[3]);
@@ -1914,9 +1939,18 @@ int main(int argc, char **argv)
 	cout << countNegativeCounterExample << ",";
 	cout << NoOFExactRules << ",";
 	cout << NoOfRulesConfHighThanPoint9 << ",";
-	// cout << qf << ",";
-	// cout << TIMEPRINT(Time_qf);
 	cout << "\n\n";
+
+	cout << "foundCexCount\n";
+	for(int i = 0; i < maxThreads; i++)
+		cout << foundCexCount[i] << " ";
+	cout << "\nupdateImplicationIteration\n";
+	for(int i = 0; i < maxThreads; i++)
+		cout << updateImplicationIteration[i] << " ";
+	cout << "\nrandGenCount\n";
+	for(int i = 0; i < maxThreads; i++)
+		cout << randGenCount[i] << " ";
+	cout << "\n";
 
 	return 0;
 }
