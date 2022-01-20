@@ -76,7 +76,7 @@ std::discrete_distribution<long long> discreteDistributionSquared;
 std::discrete_distribution<long long> discreteDistributionDiscriminativity;
 std::binomial_distribution<int> binomialDistribution;
 std::default_random_engine re(rd());
-std::minstd_rand new_rand;
+thread_local std::minstd_rand new_rand(rd());
 
 vector<std::discrete_distribution<int>> discreteDistributionAttributeSets;
 vector<int> objectLabels, positiveObjects, negativeObjects;
@@ -93,9 +93,6 @@ int countClosedPremises = 0;
 int k_value;
 double minconf_value;
 double percentAttrClosure;
-
-// per thread debugging
-long long int *randGenCount, *foundCexCount, *updateImplicationIteration;
 
 //Can be used in case the input format is:
 //Each line has the attribute numbers of attributes associated with the object represented by the line number.
@@ -417,14 +414,12 @@ boost::dynamic_bitset<unsigned long> randomContextClosureBS(boost::dynamic_bitse
 
 	if (aid != -1)
 	{
-
 		for (int i = 0; i < attrInp[aid].size(); i++)
 		{
 			int cObj = attrInp[aid][i];
 
 			if (aBS.is_subset_of(objInpBS[cObj]))
 			{
-				randGenCount[threadIndex] += 1;
 				if ((new_rand() < percentObj))
 					ansBS &= objInpBS[cObj];
 			}
@@ -627,7 +622,6 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 				counterExampleBS = cX;
 				isPositiveCounterExample = true;
 				lck.unlock();
-				foundCexCount[s]++;
 				break;
 			}
 
@@ -638,7 +632,6 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 				counterExampleBS = cL;
 				isPositiveCounterExample = false;
 				lck.unlock();
-				foundCexCount[s]++;
 				break;
 			}
 		}
@@ -654,7 +647,6 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 					counterExampleBS = X;
 					isPositiveCounterExample = true;
 					lck.unlock();
-					foundCexCount[s]++;
 					break;
 				}
 			}
@@ -667,7 +659,6 @@ void getCounterExample(vector<implicationBS> &basis, int s)
 					counterExampleBS = X;
 					isPositiveCounterExample = false;
 					lck.unlock();
-					foundCexCount[s]++;
 					break;
 				}
 			}
@@ -734,7 +725,6 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis, int threadIndex)
 		while (implicationsSeen < basis.size())
 		{
 			UpdateImplicationTries++;
-			updateImplicationIteration[threadIndex]++;
 			int currIndex = implicationsSeen;
 			boost::dynamic_bitset<unsigned long> A = basis[currIndex].lhs;
 			boost::dynamic_bitset<unsigned long> B = basis[currIndex].rhs;
@@ -757,7 +747,6 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis, int threadIndex)
 		while ((implicationsSeen < basis.size()) && (!basisUpdate))
 		{
 			UpdateImplicationTries++;
-			updateImplicationIteration[threadIndex]++;
 			boost::dynamic_bitset<unsigned long> A = basis[implicationsSeen].lhs;
 			boost::dynamic_bitset<unsigned long> B = basis[implicationsSeen].rhs;
 			int curIndex = implicationsSeen;
@@ -1819,17 +1808,6 @@ void get_kvalue_minconf(string filename)
 	minconf_value = (double)stoi(minconf) / 100;
 }
 
-void intialiseDebugStores(int maxThreads)
-{
-	randGenCount = new long long int[maxThreads];
-	foundCexCount = new long long int[maxThreads];
-	updateImplicationIteration = new long long int[maxThreads];
-	for(int i = 0; i < maxThreads; i++){
-		randGenCount[i] = 0;
-		foundCexCount[i] = 0;
-		updateImplicationIteration[i] = 0;
-	}
-}
 
 using namespace std;
 
@@ -1837,7 +1815,6 @@ int main(int argc, char **argv)
 {
 	string filename = argv[9];
 	get_kvalue_minconf(filename);
-	intialiseDebugStores(atoi(argv[7]));
 
 	startTime = chrono::high_resolution_clock::now();
 	srand(time(NULL));
@@ -1940,17 +1917,6 @@ int main(int argc, char **argv)
 	cout << NoOFExactRules << ",";
 	cout << NoOfRulesConfHighThanPoint9 << ",";
 	cout << "\n\n";
-
-	cout << "foundCexCount\n";
-	for(int i = 0; i < maxThreads; i++)
-		cout << foundCexCount[i] << " ";
-	cout << "\nupdateImplicationIteration\n";
-	for(int i = 0; i < maxThreads; i++)
-		cout << updateImplicationIteration[i] << " ";
-	cout << "\nrandGenCount\n";
-	for(int i = 0; i < maxThreads; i++)
-		cout << randGenCount[i] << " ";
-	cout << "\n";
 
 	return 0;
 }
