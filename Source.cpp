@@ -29,7 +29,7 @@ typedef struct
 {
 	boost::dynamic_bitset<unsigned long> lhs;
 	boost::dynamic_bitset<unsigned long> rhs;
-	int isDeleted=0;
+	int isDeleted = 0;
 } implicationBS;
 
 #define TIMEPRINT(X) (((double)X) / ((double)1000000))
@@ -70,7 +70,7 @@ bool emptySetClosureComputed = false;
 boost::dynamic_bitset<unsigned long> emptySetClosure;
 long long emptySetClosureComputes = 0;
 long long aEqualToCCount = 0;
-int notFoundKRules=1;
+int notFoundKRules = 1;
 std::random_device rd;
 std::discrete_distribution<int> discreteDistribution, discreteDistributionArea;
 std::discrete_distribution<long long> discreteDistributionSquared;
@@ -107,6 +107,9 @@ vector<implicationBS> topKRulesBS;
 vector<int> topK_times;
 int timePointer = 0;
 
+bool debug = true; // print iteration details
+int print_count = 0;
+
 void readFormalContext1(string fileName)
 {
 	ifstream inFile(fileName);
@@ -131,10 +134,13 @@ void readFormalContext1(string fileName)
 	inFile.close();
 }
 
-int calculateSize(vector<implicationBS> &ansBS){
-	int count=0;
-	for(int i=0;i<ansBS.size();i++){
-		if(ansBS[i].isDeleted==0){
+int calculateSize(vector<implicationBS> &ansBS)
+{
+	int count = 0;
+	for (int i = 0; i < ansBS.size(); i++)
+	{
+		if (ansBS[i].isDeleted == 0)
+		{
 			count++;
 		}
 	}
@@ -477,7 +483,8 @@ boost::dynamic_bitset<unsigned long> closureBS(vector<implicationBS> &basis, boo
 
 		for (int i = 0; i < basis.size(); i++)
 		{
-			if(basis[i].isDeleted){
+			if (basis[i].isDeleted)
+			{
 				continue;
 			}
 			if (cons[i] == true)
@@ -742,7 +749,8 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis, int threadIndex)
 			UpdateImplicationTries++;
 			int currIndex = implicationsSeen;
 			implicationsSeen++;
-			if(basis[currIndex].isDeleted==1){
+			if (basis[currIndex].isDeleted == 1)
+			{
 				continue;
 			}
 			boost::dynamic_bitset<unsigned long> A = basis[currIndex].lhs;
@@ -769,7 +777,8 @@ void tryToUpdateImplicationBasis(vector<implicationBS> &basis, int threadIndex)
 			boost::dynamic_bitset<unsigned long> B = basis[implicationsSeen].rhs;
 			int curIndex = implicationsSeen;
 			implicationsSeen++;
-			if(basis[curIndex].isDeleted==1){
+			if (basis[curIndex].isDeleted == 1)
+			{
 				continue;
 			}
 			boost::dynamic_bitset<unsigned long> C = A & counterExampleBS;
@@ -913,7 +922,8 @@ double calculatePrecision(vector<implicationBS> &basisBS)
 
 	for (int i = 0; i < basisBS.size(); i++)
 	{
-		if(basisBS[i].isDeleted){
+		if (basisBS[i].isDeleted)
+		{
 			continue;
 		}
 		boost::dynamic_bitset<unsigned long> lhsCl =
@@ -932,7 +942,8 @@ double calculatePrecisionFilter(vector<implicationBS> &baBS, double minconf)
 	vector<implicationBS> basisBS;
 	for (int i = 0; i < baBS.size(); i++)
 	{
-		if(baBS[i].isDeleted){
+		if (baBS[i].isDeleted)
+		{
 			continue;
 		}
 		if (FindConfidenceOfParticularImplication(baBS, i) >= minconf_value)
@@ -951,7 +962,7 @@ double calculatePrecisionFilter(vector<implicationBS> &baBS, double minconf)
 			result++;
 	}
 
-	return result / ((double)basisBS.size());
+	return result / ((double)calculateSize(basisBS));
 }
 
 double calculateRecall(vector<implicationBS> &basisBS)
@@ -961,7 +972,7 @@ double calculateRecall(vector<implicationBS> &basisBS)
 
 	for (int i = 0; i < topKRulesBS.size(); i++)
 	{
-	
+
 		boost::dynamic_bitset<unsigned long> lhsCl =
 			closureBS(basisBS, topKRulesBS[i].lhs);
 
@@ -980,7 +991,8 @@ double calculateRecallFilter(vector<implicationBS> &baBS, double minconf)
 	std::vector<implicationBS> basisBS;
 	for (int i = 0; i < baBS.size(); i++)
 	{
-		if(baBS[i].isDeleted){
+		if (baBS[i].isDeleted)
+		{
 			continue;
 		}
 		if (FindConfidenceOfParticularImplication(baBS, i) >= minconf_value)
@@ -1043,9 +1055,12 @@ double calculateRecallFilter(vector<implicationBS> &baBS, double minconf)
 
 void verboseImplicationOutput(vector<implicationBS> &ansBS, double timestamp)
 {
+	cout << "\n";
+
 	for (int i = 0; i < ansBS.size(); i++)
 	{
-		if(ansBS[i].isDeleted==1){
+		if (ansBS[i].isDeleted == 1)
+		{
 			continue;
 		}
 		vector<int> impl_lhs = attrBSToAttrVector(ansBS[i].lhs), impl_rhs = attrBSToAttrVector(ansBS[i].rhs);
@@ -1075,7 +1090,7 @@ void verboseImplicationOutput(vector<implicationBS> &ansBS, double timestamp)
 		printVector(vec);
 		cout << " percent: " << PremWiseRecall[i].second << endl;
 	}
-	cout << "\nBasisSize " << calculateSize(ansBS)<<" "<<ansBS.size() << "  Timestamp " << TIMEPRINT(timestamp) << " "
+	cout << "\nBasisSize " << calculateSize(ansBS) << " " << ansBS.size() << "  Timestamp " << TIMEPRINT(timestamp) << " "
 		 << "Precision " << precision << " Recall " << recall << " Closed Count: " << countClosedPremises << "\n";
 	cout << "\n\n";
 }
@@ -1168,9 +1183,10 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 			break;
 
 		boost::dynamic_bitset<unsigned long> X = counterExampleBS;
+		vector<int> vectorX = attrBSToAttrVector(X);
 		//printVector(X);
+
 		totCounterExamples++;
-		// cout << "Got counter example" << endl;
 		// cout << "Counterexample found after " << totTries << " tries\n";
 		vector<int> counterExampleFound = attrBSToAttrVector(X);
 		if (isPositiveCounterExample)
@@ -1217,31 +1233,115 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 		updownTime += thisIterMaxContextClosureTime;
 		// cout << UpdateImplicationTries << " iterations in tryToUpdateImplicationBasis\n";
 
+		if(gCounter % 5000 == 0)
+		{
+			print_count = 0;
+			debug = true;
+		}
+
+		if (debug)
+		{
+			auto debug_start = std::chrono::high_resolution_clock::now();
+			print_count++;
+
+			cout << "\nIteration " << gCounter << "\n";
+			cout << "CS: ";
+			printVector(vectorX);
+			cout << "Pos: " << isPositiveCounterExample << " Tries: " << totTries << "\n";
+
+			if (isPositiveCounterExample)
+			{
+				cout << "Update " << updatedImplications.size() << " Implications\n";
+				for (auto &updateImp : updatedImplications)
+				{
+					vector<int> initial_lhs = attrBSToAttrVector(ansBS[updateImp.first].lhs),
+								initial_rhs = attrBSToAttrVector(ansBS[updateImp.first].rhs),
+								new_lhs = attrBSToAttrVector(updateImp.second.lhs),
+								new_rhs = attrBSToAttrVector(updateImp.second.rhs);
+					cout << "\nIndex " << updateImp.first << "\n";
+					cout << "Old ";
+					printVector(initial_lhs);
+					cout << " =>  ";
+					printVector(initial_rhs);
+					cout << "\n";
+
+					if (updateImp.second.lhs == updateImp.second.rhs)
+					{
+						cout << "Delete\n";
+						continue;
+					}
+
+					cout << "New ";
+					printVector(new_lhs);
+					cout << " =>  ";
+					printVector(new_rhs);
+					cout << "\n";
+				}
+			}
+			else
+			{
+				if (!basisUpdate)
+				{
+					boost::dynamic_bitset<unsigned long> allattribute(attrInp.size());
+					allattribute.set();
+					allattribute[0] = false;
+					vector<int> vectorM = attrBSToAttrVector(allattribute);
+
+					cout << "\nIndex " << ansBS.size() << "\n";
+					cout << "Add ";
+					printVector(vectorX);
+					cout << " =>  ";
+					printVector(vectorM);
+					cout << "\n";
+				}
+				else
+				{
+					vector<int> initialLHS = attrBSToAttrVector(ansBS[indexOfUpdatedImplication].lhs),
+								initialRHS = attrBSToAttrVector(ansBS[indexOfUpdatedImplication].rhs),
+								newLHS = attrBSToAttrVector(updatedImplication.lhs),
+								newRHS = attrBSToAttrVector(updatedImplication.rhs);
+
+					cout << "\nIndex " << indexOfUpdatedImplication << "\n";
+					cout << "Old ";
+					printVector(initialLHS);
+					cout << " => ";
+					printVector(initialRHS);
+					cout << "\n";
+					cout << "New ";
+					printVector(newLHS);
+					cout << " => ";
+					printVector(newRHS);
+					cout << "\n";
+				}
+			}
+
+			if(print_count == 20)
+			{
+				debug = false;
+			}
+
+			auto debug_end = std::chrono::high_resolution_clock::now();
+			auto debug_duration = chrono::duration_cast<chrono::microseconds>(debug_end - debug_start).count();
+			ioTime += debug_duration;
+		}
+
 		if (isPositiveCounterExample)
 		{
 			for (auto &updateImp : updatedImplications)
 			{
-				vector<int> initial_lhs = attrBSToAttrVector(ansBS[updateImp.first].lhs),
-							initial_rhs = attrBSToAttrVector(ansBS[updateImp.first].rhs);
-				// cout<<"\nPrevious implication at index "<<updateImp.first<<" was: ";printVector(initial_lhs);cout<<" ==> ";printVector(initial_rhs);cout<<"\n";
-				
-				if(updateImp.second.lhs==updateImp.second.rhs){
-					ansBS[updateImp.first].isDeleted=1;
+				if (updateImp.second.lhs == updateImp.second.rhs)
+				{
+					ansBS[updateImp.first].isDeleted = 1;
 					count_rules--;
 					continue;
-
 				}
-				
-				
+
 				bool isgrt = false;
 				if (FindConfidenceOfParticularImplication(ansBS, updateImp.first) >= minconf_value)
 				{
 					isgrt = true;
 				}
 				ansBS[updateImp.first] = updateImp.second;
-
-				vector<int> new_lhs = attrBSToAttrVector(ansBS[updateImp.first].lhs),
-							new_rhs = attrBSToAttrVector(ansBS[updateImp.first].rhs);
 
 				int ToBeAdded = 0;
 				if (FindConfidenceOfParticularImplication(ansBS, updateImp.first) >= minconf_value)
@@ -1265,8 +1365,6 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 						}
 					}
 				}
-
-				// cout<<"Now implication is :";printVector(initial_lhs);cout<<" ==> ";printVector(initial_rhs);cout<<"\n\n";
 			}
 		}
 		else
@@ -1278,24 +1376,13 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				allattribute.set();
 				allattribute[0] = false;
 				ansBS.push_back(implicationBS{X, allattribute, 0});
-				// cout<<"Hii"<<endl;
 				if (FindConfidenceOfParticularImplication(ansBS, ansBS.size() - 1) >= minconf_value)
 				{
 					count_rules++;
 				}
-				// only for debugging
-				// vector<int> vectorX = attrBSToAttrVector(X), vectorM = attrBSToAttrVector(allattribute);
-				// printVector(vectorX); cout << "=>"; printVector(vectorM); cout << "," << indexOfUpdatedImplication << "," << (chrono::duration_cast<chrono::microseconds>(chrono::high_resolution_clock::now() - startTime)).count() << "\n";
-				// cout << "Adding X -> M as : "; printVector(vectorX); cout << " ==> "; printVector(vectorM); cout << "\n\n";
 			}
 			else
 			{
-				vector<int> initialLHS = attrBSToAttrVector(ansBS[indexOfUpdatedImplication].lhs),
-							initialRHS = attrBSToAttrVector(ansBS[indexOfUpdatedImplication].rhs),
-							newLHS = attrBSToAttrVector(updatedImplication.lhs),
-							newRHS = attrBSToAttrVector(updatedImplication.rhs);
-				// cout << "Initial Implication: "; printVector(initialLHS); cout << " ==> "; printVector(initialRHS); cout << "\n";
-				// cout << "Updated Implication: "; printVector(newLHS); cout << " ==> "; printVector(newRHS); cout << "\n\n";
 
 				bool isgrt = false;
 				double confBefore = FindConfidenceOfParticularImplication(ansBS, indexOfUpdatedImplication);
@@ -1303,23 +1390,14 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 				{
 					isgrt = true;
 				}
-				// cout<<ansBS[indexOfUpdatedImplication].lhs<<endl;;
-				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].lhs));
-				// cout<<"==> ";
-				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].rhs));
 				int supp_impl_before = findImplicationSupportOfParticularImplication(ansBS, indexOfUpdatedImplication),
 					supp_prem_before = findPremiseSupportOfParticularImplication(ansBS, indexOfUpdatedImplication);
 				ansBS[indexOfUpdatedImplication] = updatedImplication;
-
-				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].lhs));
-				// cout<<"==> ";
-				// printVector(attrBSToAttrVector(ansBS[indexOfUpdatedImplication].rhs));
 
 				int ToBeAdded = 0;
 				double confAfter = FindConfidenceOfParticularImplication(ansBS, indexOfUpdatedImplication);
 				if (confAfter >= minconf_value)
 				{
-					// cout<<minconf_value<<endl;
 					ToBeAdded = 1;
 				}
 				if (!isgrt)
@@ -1350,7 +1428,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 			if (count_rules >= k_value)
 			{
 				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
-				notFoundKRules=0;
+				notFoundKRules = 0;
 				auto ioStart = chrono::high_resolution_clock::now();
 				verboseImplicationOutput(ansBS, time_difference);
 				auto ioEnd = chrono::high_resolution_clock::now();
@@ -1388,13 +1466,14 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 
 		// cout << duration.count() << "\n";
 	}
-	if(notFoundKRules){
+
+	if (notFoundKRules)
+	{
 		auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
 		auto ioStart = chrono::high_resolution_clock::now();
 		verboseImplicationOutput(ansBS, time_difference);
 		auto ioEnd = chrono::high_resolution_clock::now();
 		ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
-
 	}
 
 	ansBasisBS = ansBS;
@@ -1854,7 +1933,6 @@ void get_kvalue_minconf(string filename)
 	minconf_value = (double)stoi(minconf) / 100;
 }
 
-
 using namespace std;
 
 int main(int argc, char **argv)
@@ -1878,7 +1956,6 @@ int main(int argc, char **argv)
 	{
 		topK_times.push_back(stoi(argv[i]));
 	}
-
 
 	epsilon = atof(argv[2]);
 	del = atof(argv[3]);
