@@ -986,6 +986,7 @@ double calculateRecall(vector<implicationBS> &basisBS)
 std::vector<std::pair<boost::dynamic_bitset<unsigned long>, float>> PremWiseRecall;
 double calculateRecallFilter(vector<implicationBS> &baBS, double minconf)
 {
+	PremWiseRecall.clear();
 
 	long long result = 0;
 	std::vector<implicationBS> basisBS;
@@ -1117,6 +1118,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 	vector<implicationBS> ansBS;
 	double prevIterTime1 = 0, prevIterTime2 = 0;
 	double prevThreads1 = 1, prevThreads2 = 1;
+	double iterationIOTime = 0;
 
 	int count_rules = 0;
 	while (true)
@@ -1124,6 +1126,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 		auto start = chrono::high_resolution_clock::now();
 		gCounter++;
 		totTries = 0;
+		iterationIOTime = 0;
 		// cout << "Going to get counter example. (Iteration Number: " << gCounter << " )" << endl;
 		getLoopCount();
 		// cout << "Max number of tries for this iteration: " << maxTries << "\n";
@@ -1314,6 +1317,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 					cout << "\n";
 				}
 			}
+			verboseImplicationOutput(ansBS, (debug_start - startTime).count() - ioTime - iterationIOTime);
 
 			if(print_count == 20)
 			{
@@ -1322,7 +1326,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 
 			auto debug_end = std::chrono::high_resolution_clock::now();
 			auto debug_duration = chrono::duration_cast<chrono::microseconds>(debug_end - debug_start).count();
-			ioTime += debug_duration;
+			iterationIOTime += debug_duration;
 		}
 
 		if (isPositiveCounterExample)
@@ -1427,12 +1431,12 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 
 			if (count_rules >= k_value)
 			{
-				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
+				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime - iterationIOTime;
 				notFoundKRules = 0;
 				auto ioStart = chrono::high_resolution_clock::now();
 				verboseImplicationOutput(ansBS, time_difference);
 				auto ioEnd = chrono::high_resolution_clock::now();
-				ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
+				iterationIOTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
 				break;
 			}
 		}
@@ -1446,13 +1450,13 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 			else
 			{
 				countClosedPremises = 0;
-				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime;
+				auto time_difference = (chrono::duration_cast<chrono::microseconds>((chrono::high_resolution_clock::now() - startTime))).count() - ioTime - iterationIOTime;
 				if (time_difference >= topK_times[timePointer] * 1000000)
 				{
 					auto ioStart = chrono::high_resolution_clock::now();
 					verboseImplicationOutput(ansBS, time_difference);
 					auto ioEnd = chrono::high_resolution_clock::now();
-					ioTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
+					iterationIOTime += (chrono::duration_cast<chrono::microseconds>(ioEnd - ioStart)).count();
 					timePointer++;
 				}
 			}
@@ -1462,7 +1466,8 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 		totalExecTime2 += (chrono::duration_cast<chrono::microseconds>(end - start)).count() - ioTime;
 		duration = chrono::duration_cast<chrono::microseconds>(end - start);
 		prevThreads2 = numThreads;
-		prevIterTime2 = duration.count();
+		prevIterTime2 = duration.count() - iterationIOTime;
+		ioTime += iterationIOTime;
 
 		// cout << duration.count() << "\n";
 	}
