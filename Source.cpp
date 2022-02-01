@@ -1301,11 +1301,10 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 			{
 				if (updateImp.second.lhs == updateImp.second.rhs)
 				{
-					// ansBS[updateImp.first] = ansBS.back();
-					// ansBS.pop_back();
 					if (FindConfidenceOfParticularImplication(ansBS, updateImp.first) >= minconf_value)
 						count_rules--;
-					ansBS.erase(next(ansBS.begin(), updateImp.first));
+					ansBS[updateImp.first] = ansBS.back();
+					ansBS.pop_back();
 					continue;
 				}
 
