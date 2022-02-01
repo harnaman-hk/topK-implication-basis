@@ -108,6 +108,8 @@ int timePointer = 0;
 
 bool debug = true; // print iteration details
 int print_count = 0;
+int maxImplicationUpdates = 0;
+int minconfRulesCount = 0;
 
 void readFormalContext1(string fileName)
 {
@@ -1019,6 +1021,7 @@ double calculateRecallFilter(vector<implicationBS> &baBS, double minconf)
 void verboseImplicationOutput(vector<implicationBS> &ansBS, double timestamp)
 {
 	cout << "\n";
+	countClosedPremises = 0;
 
 	for (int i = 0; i < ansBS.size(); i++)
 	{
@@ -1050,8 +1053,8 @@ void verboseImplicationOutput(vector<implicationBS> &ansBS, double timestamp)
 		cout << " percent: " << PremWiseRecall[i].second << endl;
 	}
 	cout << "\nBasisSize " << ansBS.size() << "  Timestamp " << TIMEPRINT(timestamp) << " "
-		 << "Precision " << precision << " Recall " << recall << " Closed Count: " << countClosedPremises << "\n";
-	cout << "\n\n";
+		 << "Precision " << precision << " Recall " << recall << " Closed Count: " << countClosedPremises << " Max Updates: " << maxImplicationUpdates << "\n";
+	cout << "\n";
 }
 
 void setNumThreads()
@@ -1275,7 +1278,8 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 					cout << "\n";
 				}
 			}
-			verboseImplicationOutput(ansBS, (debug_start - startTime).count() - ioTime - iterationIOTime);
+
+			verboseImplicationOutput(ansBS, (chrono::duration_cast<chrono::microseconds>(debug_start- startTime)).count() - ioTime - iterationIOTime);
 
 			if (print_count == 20)
 			{
@@ -1289,20 +1293,19 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 
 		if (isPositiveCounterExample)
 		{
-			sort(updatedImplications.begin(), updatedImplications.end(), [](pair<int, implicationBS> &a, pair<int, implicationBS> &b)
-				 { return a.first < b.first; });
-			int deletedSoFar = 0;
+			sort(updatedImplications.begin(), updatedImplications.end(), 
+				[](pair<int, implicationBS> &a, pair<int, implicationBS> &b)
+				 { return a.first > b.first; });
+
 			for (auto &updateImp : updatedImplications)
 			{
-				updateImp.first -= deletedSoFar;
 				if (updateImp.second.lhs == updateImp.second.rhs)
 				{
-					// ansBS[updateImp.first].isDeleted = 1;
-					auto itr = ansBS.begin() + updateImp.first;
-					ansBS.erase(itr);
-					deletedSoFar++;
+					// ansBS[updateImp.first] = ansBS.back();
+					// ansBS.pop_back();
 					if (FindConfidenceOfParticularImplication(ansBS, updateImp.first) >= minconf_value)
 						count_rules--;
+					ansBS.erase(next(ansBS.begin(), updateImp.first));
 					continue;
 				}
 
@@ -1336,6 +1339,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 					}
 				}
 			}
+			maxImplicationUpdates = max(maxImplicationUpdates, (int)updatedImplications.size());
 		}
 		else
 		{
@@ -1448,6 +1452,7 @@ vector<implication> generateImplicationBasis(ThreadPool &threadPool)
 	}
 
 	ansBasisBS = ansBS;
+	minconfRulesCount = count_rules;
 	return BSBasisToVectorBasis(ansBS);
 }
 
@@ -1998,8 +2003,7 @@ int main(int argc, char **argv)
 	// 	}
 	// }
 
-	cout << "TimeTaken: " << TIMEPRINT(TotalExecTime - ioTime) << " Basis Size: "
-		 << " " << ans.size() << " Closed Count: " << countClosedPremises << "\n";
+	cout << "TimeTaken: " << TIMEPRINT(TotalExecTime - ioTime) << " Basis Size: "<< ans.size() << " Minconf Rules: " << minconfRulesCount << " Closed Count: " << countClosedPremises << "\n";
 	// ExecutionTime, #iteration, #implications, #TotalCounterEx, #positiveCounterEx, #negativeCounterEx, #exactRules, #highConfidence, qualityFactor, QFtime
 	for (int i = 1; i < 10; i++)
 		cout << argv[i] << ",";
@@ -2011,6 +2015,7 @@ int main(int argc, char **argv)
 	cout << countNegativeCounterExample << ",";
 	cout << NoOFExactRules << ",";
 	cout << NoOfRulesConfHighThanPoint9 << ",";
+	cout << maxImplicationUpdates << ",";
 	cout << "\n\n";
 
 	return 0;
